@@ -71,7 +71,6 @@ Banco de dados SQLite com TypeORM.
 
 Se ainda não tem o NestJS instalado, rode:
 
-bash
 `npm i -g @nestjs/cli`
 
 ### Agora, crie um novo projeto:
@@ -84,7 +83,6 @@ npm install
 
 ### Instale as dependências necessárias:
 
-bash
 `npm install @nestjs/cqrs @nestjs/typeorm typeorm sqlite3`
 
 ## 2️⃣ Configurando o Banco de Dados
@@ -92,8 +90,6 @@ bash
 Agora, vamos configurar o TypeORM para conectar ao banco de dados SQLite.
 
 📌 Abra src/app.module.ts e configure o banco:
-
-bash
 
 ```
 import { Module } from '@nestjs/common';
@@ -130,8 +126,6 @@ export class AppModule {}
 
 📌 Crie src/models/task.entity.ts:
 
-bash
-
 ```
 import { Entity, PrimaryGeneratedColumn, Column } from 'typeorm';
 
@@ -151,8 +145,6 @@ export class Task {
 ## 4️⃣ Criando o Repositório
 
 📌 Crie src/repositories/task.repository.ts:
-
-bash
 
 ```
 import { Injectable } from '@nestjs/common';
@@ -179,8 +171,6 @@ export class TaskRepository {
 
 📌 Crie src/commands/create-task.command.ts:
 
-bash
-
 ```
 import { ICommand } from '@nestjs/cqrs';
 
@@ -190,8 +180,6 @@ export class CreateTaskCommand implements ICommand {
 ```
 
 📌 Crie src/commands/create-task.handler.ts:
-
-bash
 
 ```
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
@@ -240,8 +228,6 @@ export class GetTasksHandler implements IQueryHandler<GetTasksQuery> {
 ## 7️⃣ Testando a API
 
 `npm run start`
-
-bash
 
 ```
 curl -X POST http://localhost:3000/tasks -H "Content-Type: application/json" -d '{"title": "Aprender CQRS", "description": "Estudo prático"}'
