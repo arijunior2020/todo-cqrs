@@ -21,78 +21,230 @@
   <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
   [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
 
-## Description
+# 📌 Padrão CQRS: O que é, Vantagens e Implementação Prática no NestJS
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+## 📖 Introdução ao CQRS
 
-## Project setup
+O CQRS (Command Query Responsibility Segregation) é um padrão arquitetural que separa as operações de escrita (commands) e leitura (queries) em um sistema. Ele é frequentemente usado em sistemas distribuídos, garantindo maior escalabilidade e organização do código.
 
-```bash
-$ npm install
+🔹 Como Funciona o CQRS?
+Em uma aplicação tradicional, temos uma única interface para criar, ler, atualizar e deletar dados (CRUD). No CQRS, essa abordagem é separada em dois modelos diferentes:
+
+- Commands (Comandos) → Escrita: Operações que modificam os dados, como criar, atualizar ou deletar.
+- Queries (Consultas) → Leitura: Operações que buscam os dados sem modificá-los.
+
+Isso permite que as operações de leitura e escrita sejam otimizadas separadamente, melhorando a performance em sistemas complexos.
+
+# 📌 Vantagens e Desvantagens do CQRS
+
+✅ Vantagens do CQRS
+Melhor desempenho: Como leitura e escrita são separadas, cada uma pode ser otimizada individualmente.
+Escalabilidade: Permite escalar consultas e comandos separadamente (ex: replicação de bancos de leitura).
+Segurança e controle: Comandos podem ter regras específicas sem afetar as consultas.
+Código mais organizado: Cada responsabilidade tem sua própria lógica, evitando grandes repositórios monolíticos.
+
+❌ Desvantagens do CQRS
+Aumento da complexidade: Para aplicações simples, CQRS pode ser um "exagero" desnecessário.
+Mais código e camadas: O sistema terá mais classes (Commands, Handlers, Queries, Events).
+Sincronização de dados: Se leitura e escrita forem separadas em bancos distintos, manter a consistência pode ser um desafio.
+
+# 📌 Quando Usar CQRS?
+
+💡 Indicado para:
+✅ Sistemas de alta escalabilidade → Quando há muitas operações de leitura e escrita concorrentes. ✅ Aplicações Event-Driven → Quando precisamos processar eventos e reações a comandos. ✅ Domínios complexos (DDD) → Quando diferentes regras de negócio governam leitura e escrita.
+
+# 🚫 Evitar CQRS em:
+
+❌ Aplicações CRUD simples → Se o sistema tem apenas operações básicas, CQRS pode ser um exagero. ❌ Projetos pequenos → A separação de leitura e escrita pode dificultar a manutenção sem necessidade.
+
+📌 Laboratório Prático: Implementando CQRS com NestJS
+Agora que entendemos o CQRS, vamos implementá-lo na prática usando NestJS e TypeORM com SQLite.
+
+📌 O que vamos criar?
+Uma API simples para gerenciar tarefas (To-Do List) com:
+
+Comandos (Commands) para criação de tarefas.
+Consultas (Queries) para listar todas as tarefas.
+Banco de dados SQLite com TypeORM.
+
+## 1️⃣ Criando o Projeto NestJS
+
+Se ainda não tem o NestJS instalado, rode:
+
+bash
+`npm i -g @nestjs/cli`
+
+### Agora, crie um novo projeto:
+
+```
+nest new todo-cqrs
+cd todo-cqrs
+npm install
 ```
 
-## Compile and run the project
+### Instale as dependências necessárias:
 
-```bash
-# development
-$ npm run start
+bash
+`npm install @nestjs/cqrs @nestjs/typeorm typeorm sqlite3`
 
-# watch mode
-$ npm run start:dev
+## 2️⃣ Configurando o Banco de Dados
 
-# production mode
-$ npm run start:prod
+Agora, vamos configurar o TypeORM para conectar ao banco de dados SQLite.
+
+📌 Abra src/app.module.ts e configure o banco:
+
+bash
+
+```
+import { Module } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { CqrsModule } from '@nestjs/cqrs';
+import { Task } from './models/task.entity';
+import { TaskRepository } from './repositories/task.repository';
+import { CreateTaskHandler } from './commands/create-task.handler';
+import { GetTasksHandler } from './queries/get-tasks.handler';
+import { TaskController } from './controllers/task.controller';
+
+@Module({
+  imports: [
+    CqrsModule,
+    TypeOrmModule.forRoot({
+      type: 'sqlite',
+      database: 'database.sqlite',
+      entities: [Task],
+      synchronize: true,
+    }),
+    TypeOrmModule.forFeature([Task]),
+  ],
+  controllers: [TaskController],
+  providers: [
+    TaskRepository,
+    CreateTaskHandler,
+    GetTasksHandler,
+  ],
+})
+export class AppModule {}
 ```
 
-## Run tests
+## 3️⃣ Criando a Entidade de Tarefa
 
-```bash
-# unit tests
-$ npm run test
+📌 Crie src/models/task.entity.ts:
 
-# e2e tests
-$ npm run test:e2e
+bash
 
-# test coverage
-$ npm run test:cov
+```
+import { Entity, PrimaryGeneratedColumn, Column } from 'typeorm';
+
+@Entity()
+export class Task {
+  @PrimaryGeneratedColumn()
+  id: number;
+
+  @Column()
+  title: string;
+
+  @Column()
+  description: string;
+}
 ```
 
-## Deployment
+## 4️⃣ Criando o Repositório
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+📌 Crie src/repositories/task.repository.ts:
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+bash
 
-```bash
-$ npm install -g mau
-$ mau deploy
+```
+import { Injectable } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { Task } from '../models/task.entity';
+
+@Injectable()
+export class TaskRepository {
+  constructor(@InjectRepository(Task) private readonly repo: Repository<Task>) {}
+
+  async createTask(title: string, description: string): Promise<Task> {
+    const task = this.repo.create({ title, description });
+    return this.repo.save(task);
+  }
+
+  async getAllTasks(): Promise<Task[]> {
+    return this.repo.find();
+  }
+}
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+## 5️⃣ Criando os Commands (Escrita)
 
-## Resources
+📌 Crie src/commands/create-task.command.ts:
 
-Check out a few resources that may come in handy when working with NestJS:
+bash
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+```
+import { ICommand } from '@nestjs/cqrs';
 
-## Support
+export class CreateTaskCommand implements ICommand {
+  constructor(public readonly title: string, public readonly description: string) {}
+}
+```
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+📌 Crie src/commands/create-task.handler.ts:
 
-## Stay in touch
+bash
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+```
+import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
+import { CreateTaskCommand } from './create-task.command';
+import { TaskRepository } from '../repositories/task.repository';
+import { Task } from '../models/task.entity';
 
-## License
+@CommandHandler(CreateTaskCommand)
+export class CreateTaskHandler implements ICommandHandler<CreateTaskCommand> {
+  constructor(private readonly taskRepository: TaskRepository) {}
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+  async execute(command: CreateTaskCommand): Promise<Task> {
+    return this.taskRepository.createTask(command.title, command.description);
+  }
+}
+```
+
+## 6️⃣ Criando os Queries (Leitura)
+
+📌 Crie src/queries/get-tasks.query.ts:
+
+```
+import { IQuery } from '@nestjs/cqrs';
+
+export class GetTasksQuery implements IQuery {}
+```
+
+📌 Crie src/queries/get-tasks.handler.ts:
+
+```
+import { IQueryHandler, QueryHandler } from '@nestjs/cqrs';
+import { GetTasksQuery } from './get-tasks.query';
+import { TaskRepository } from '../repositories/task.repository';
+import { Task } from '../models/task.entity';
+
+@QueryHandler(GetTasksQuery)
+export class GetTasksHandler implements IQueryHandler<GetTasksQuery> {
+  constructor(private readonly taskRepository: TaskRepository) {}
+
+  async execute(): Promise<Task[]> {
+    return await this.taskRepository.getAllTasks();
+  }
+}
+```
+
+## 7️⃣ Testando a API
+
+`npm run start`
+
+bash
+
+```
+curl -X POST http://localhost:3000/tasks -H "Content-Type: application/json" -d '{"title": "Aprender CQRS", "description": "Estudo prático"}'
+
+curl -X GET http://localhost:3000/tasks
+```
